@@ -23,6 +23,146 @@
   }
 </style>
 </head>
+<style>
+  html {
+    scroll-behavior: smooth;
+  }
+
+  #continuous-reader {
+    width: 100%;
+    margin-top: 60px;
+  }
+
+  .reader-section {
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    scroll-margin-top: 20px;
+  }
+
+  .reader-frame {
+    display: block;
+    width: 100%;
+    min-height: 700px;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    overflow: hidden;
+  }
+</style>
+<div id="continuous-reader"></div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  /* Remove the print-version pagebreak list */
+  const headings = Array.from(
+    document.querySelectorAll("h1, h2, h3, h4")
+  );
+
+  const pagebreakHeading = headings.find(function (heading) {
+    return heading.textContent
+      .toLowerCase()
+      .includes("pagebreaks of the print version");
+  });
+
+  if (pagebreakHeading) {
+    const pagebreakNav = pagebreakHeading.closest("nav");
+
+    if (pagebreakNav) {
+      pagebreakNav.remove();
+    } else {
+      pagebreakHeading.remove();
+    }
+  }
+
+  /* Find the XHTML pages listed in Contents */
+  const originalLinks = Array.from(
+    document.querySelectorAll('a[href*="xhtml/"]')
+  );
+
+  const pages = [];
+  const pageMap = new Map();
+
+  originalLinks.forEach(function (link) {
+    const url = new URL(link.getAttribute("href"), window.location.href);
+    const cleanURL = url.origin + url.pathname;
+    const filename = url.pathname.split("/").pop().toLowerCase();
+
+    /* Cover and contents are already shown */
+    if (
+      filename.includes("cover") ||
+      filename.includes("contents") ||
+      filename.includes("nav.") ||
+      filename.includes("toc.")
+    ) {
+      return;
+    }
+
+    if (!pageMap.has(cleanURL)) {
+      const pageNumber = pages.length;
+      pageMap.set(cleanURL, pageNumber);
+      pages.push({
+        url: cleanURL,
+        number: pageNumber
+      });
+    }
+  });
+
+  const reader = document.getElementById("continuous-reader");
+
+  /* Add every book page in order */
+  pages.forEach(function (page) {
+    const section = document.createElement("section");
+    section.id = "reader-page-" + page.number;
+    section.className = "reader-section";
+
+    const frame = document.createElement("iframe");
+    frame.src = page.url;
+    frame.className = "reader-frame";
+    frame.title = "Book section " + (page.number + 1);
+    frame.setAttribute("scrolling", "no");
+
+    frame.addEventListener("load", function () {
+      function resizeFrame() {
+        try {
+          const documentElement = frame.contentDocument.documentElement;
+          const body = frame.contentDocument.body;
+
+          const height = Math.max(
+            documentElement.scrollHeight,
+            body ? body.scrollHeight : 0
+          );
+
+          frame.style.height = height + "px";
+        } catch (error) {
+          frame.style.height = "1000px";
+        }
+      }
+
+      resizeFrame();
+
+      if (frame.contentDocument.body && window.ResizeObserver) {
+        const observer = new ResizeObserver(resizeFrame);
+        observer.observe(frame.contentDocument.body);
+      }
+    });
+
+    section.appendChild(frame);
+    reader.appendChild(section);
+  });
+
+  /* Change Contents links so they jump down instead */
+  originalLinks.forEach(function (link) {
+    const url = new URL(link.getAttribute("href"), window.location.href);
+    const cleanURL = url.origin + url.pathname;
+
+    if (pageMap.has(cleanURL)) {
+      link.href = "#reader-page-" + pageMap.get(cleanURL);
+      link.removeAttribute("target");
+    }
+  });
+});
+</script>
 <body>
 <section class="cover-page">
   <iframe
